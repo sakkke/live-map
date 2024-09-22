@@ -23,6 +23,7 @@ interface Marker {
 export function MapPageComponent() {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
+  const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({})
   const [lng, setLng] = useState(INITIAL_LNG)
   const [lat, setLat] = useState(INITIAL_LAT)
   const [zoom, setZoom] = useState(INITIAL_ZOOM)
@@ -60,22 +61,40 @@ export function MapPageComponent() {
     if (!map.current) return
 
     // Remove existing markers
-    markers.forEach(marker => {
-      const el = document.getElementById(`marker-${marker.id}`)
-      if (el) el.remove()
-    })
+    Object.values(markersRef.current).forEach(marker => marker.remove())
+    markersRef.current = {}
 
     // Add new markers
     markers.forEach(marker => {
       const el = document.createElement('div')
-      el.id = `marker-${marker.id}`
       el.className = 'marker'
-      el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`
+      el.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+      `
 
-      new mapboxgl.Marker(el)
+      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+        <div>
+          <p>${marker.text}</p>
+          <button class="delete-marker" data-id="${marker.id}">Delete</button>
+        </div>
+      `)
+
+      const mapboxMarker = new mapboxgl.Marker(el)
         .setLngLat(marker.lngLat)
-        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<p>${marker.text}</p>`))
+        .setPopup(popup)
         .addTo(map.current!)
+
+      markersRef.current[marker.id] = mapboxMarker
+
+      popup.on('open', () => {
+        const deleteButton = document.querySelector(`.delete-marker[data-id="${marker.id}"]`)
+        if (deleteButton) {
+          deleteButton.addEventListener('click', () => handleRemoveMarker(marker.id))
+        }
+      })
     })
   }, [markers])
 
@@ -120,6 +139,10 @@ export function MapPageComponent() {
 
   const handleRemoveMarker = (id: string) => {
     setMarkers(prev => prev.filter(marker => marker.id !== id))
+    if (markersRef.current[id]) {
+      markersRef.current[id].remove()
+      delete markersRef.current[id]
+    }
   }
 
   return (
