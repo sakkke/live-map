@@ -50,7 +50,7 @@ export function MapPageComponent() {
       map.current!.resize()
     }
     window.addEventListener('resize', resizeMap)
-  }, [])
+  }, [lat, lng, zoom])
 
   useEffect(() => {
     if (!map.current) return
@@ -109,7 +109,7 @@ export function MapPageComponent() {
   }
 
   const handleToggleLayer = () => {
-    const currentStyle = map.current!.getStyle().name
+    const currentStyle = map.current!.getStyle()?.name
     const newStyle = currentStyle === 'Mapbox Streets' 
       ? 'mapbox://styles/mapbox/satellite-v9'
       : 'mapbox://styles/mapbox/streets-v11'
@@ -118,7 +118,7 @@ export function MapPageComponent() {
 
   const handleAddMarker = () => {
     setIsAddingMarker(true)
-    const addMarkerListener = (e: mapboxgl.MapMouseEvent & mapboxgl.EventData) => {
+    const addMarkerListener = (e: mapboxgl.MapMouseEvent) => {
       const newMarker: Marker = {
         id: Date.now().toString(),
         lngLat: [e.lngLat.lng, e.lngLat.lat],
