@@ -7,6 +7,7 @@ import { ZoomIn, ZoomOut, Maximize, Layers, MapPin, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClient } from '@/utils/supabase/client'
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!
 
@@ -15,8 +16,10 @@ const INITIAL_LAT = 42.35
 const INITIAL_ZOOM = 9
 
 interface Marker {
-  id: string
-  lngLat: [number, number]
+  id?: number
+  created_at?: string
+  lng: number
+  lat: number
   text: string
 }
 
@@ -50,6 +53,26 @@ export function MapPageComponent() {
       map.current!.resize()
     }
     window.addEventListener('resize', resizeMap)
+
+    const fetchMarkers = async () => {
+      const supabase = createClient()
+      const { data: markers } = await supabase
+        .from('markers')
+        .select()
+
+      if (markers) {
+        for (const marker of markers) {
+          const newMarker: Marker = {
+            id: marker.id,
+            lng: marker.lng,
+            lat: marker.lat,
+            text: marker.text
+          }
+          setMarkers(prev => [...prev, newMarker])
+        }
+      }
+    }
+    fetchMarkers()
   }, [lat, lng, zoom])
 
   useEffect(() => {
@@ -78,16 +101,22 @@ export function MapPageComponent() {
       `)
 
       const mapboxMarker = new mapboxgl.Marker(el)
-        .setLngLat(marker.lngLat)
+        .setLngLat([marker.lng, marker.lat])
         .setPopup(popup)
         .addTo(map.current!)
 
-      markersRef.current[marker.id] = mapboxMarker
+      if (marker.id) {
+        markersRef.current[marker.id] = mapboxMarker
+      }
 
       popup.on('open', () => {
         const deleteButton = document.querySelector(`.delete-marker[data-id="${marker.id}"]`)
         if (deleteButton) {
-          deleteButton.addEventListener('click', () => handleRemoveMarker(marker.id))
+          deleteButton.addEventListener('click', () => {
+            if (marker.id) {
+              handleRemoveMarker(marker.id)
+            }
+          })
         }
       })
     })
@@ -118,25 +147,55 @@ export function MapPageComponent() {
 
   const handleAddMarker = () => {
     setIsAddingMarker(true)
-    const addMarkerListener = (e: mapboxgl.MapMouseEvent) => {
-      const newMarker: Marker = {
-        id: Date.now().toString(),
-        lngLat: [e.lngLat.lng, e.lngLat.lat],
-        text: newMarkerText || 'New marker'
+    const addMarkerListener = async (e: mapboxgl.MapMouseEvent) => {
+      try {
+        const supabase = createClient()
+        const { data: marker } = await supabase
+          .from('markers')
+          .insert([{
+            lng: e.lngLat.lng,
+            lat: e.lngLat.lat,
+            text: newMarkerText || 'New marker'
+          }])
+          .select()
+          .limit(1)
+          .single()
+
+        const newMarker: Marker = {
+          id: marker.id,
+          lng: marker.lng,
+          lat: marker.lat,
+          text: marker.text
+        }
+        setMarkers(prev => [...prev, newMarker])
+        setNewMarkerText('')
+      } catch (e) {
+        console.error(e)
       }
-      setMarkers(prev => [...prev, newMarker])
-      setNewMarkerText('')
       setIsAddingMarker(false)
       map.current!.off('click', addMarkerListener)
     }
     map.current!.on('click', addMarkerListener)
   }
 
-  const handleRemoveMarker = (id: string) => {
-    setMarkers(prev => prev.filter(marker => marker.id !== id))
-    if (markersRef.current[id]) {
-      markersRef.current[id].remove()
-      delete markersRef.current[id]
+  const handleRemoveMarker = (id: number) => {
+    try {
+      const deleteMarker = async () => {
+        const supabase = createClient()
+        await supabase
+          .from('markers')
+          .delete()
+          .eq('id', id)
+      }
+      deleteMarker()
+
+      setMarkers(prev => prev.filter(marker => marker.id !== id))
+      if (markersRef.current[id]) {
+        markersRef.current[id].remove()
+        delete markersRef.current[id]
+      }
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -192,7 +251,11 @@ export function MapPageComponent() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => handleRemoveMarker(marker.id)}
+                  onClick={() => {
+                    if (marker.id) {
+                      handleRemoveMarker(marker.id)
+                    }
+                  }}
                   aria-label={`Remove marker ${marker.text}`}
                 >
                   <X className="h-4 w-4" />
