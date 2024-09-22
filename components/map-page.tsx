@@ -11,10 +11,6 @@ import { createClient } from '@/utils/supabase/client'
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!
 
-const INITIAL_LNG = -70.9
-const INITIAL_LAT = 42.35
-const INITIAL_ZOOM = 9
-
 interface Marker {
   id?: number
   created_at?: string
@@ -23,13 +19,19 @@ interface Marker {
   text: string
 }
 
-export function MapPageComponent() {
+interface Props {
+  initialLng: number
+  initialLat: number
+  initialZoom: number
+}
+
+export function MapPageComponent({ initialLng, initialLat, initialZoom }: Props) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({})
-  const [lng, setLng] = useState(INITIAL_LNG)
-  const [lat, setLat] = useState(INITIAL_LAT)
-  const [zoom, setZoom] = useState(INITIAL_ZOOM)
+  const [lng, setLng] = useState(initialLng)
+  const [lat, setLat] = useState(initialLat)
+  const [zoom, setZoom] = useState(initialZoom)
   const [markers, setMarkers] = useState<Marker[]>([])
   const [newMarkerText, setNewMarkerText] = useState('')
   const [isAddingMarker, setIsAddingMarker] = useState(false)
@@ -132,8 +134,8 @@ export function MapPageComponent() {
 
   const handleResetView = () => {
     map.current!.flyTo({
-      center: [INITIAL_LNG, INITIAL_LAT],
-      zoom: INITIAL_ZOOM
+      center: [initialLng, initialLat],
+      zoom: initialZoom
     })
   }
 
