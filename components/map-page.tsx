@@ -50,11 +50,6 @@ export function MapPageComponent() {
       map.current!.resize()
     }
     window.addEventListener('resize', resizeMap)
-
-    return () => {
-      map.current!.remove()
-      window.removeEventListener('resize', resizeMap)
-    }
   }, [])
 
   useEffect(() => {
